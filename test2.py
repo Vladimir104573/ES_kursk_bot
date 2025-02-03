@@ -1,19 +1,26 @@
-import multiprocessing
+import time
+# test.py и test2.py предназначены для теста обмена сообщениями между скриптом-граббером и скиптом бота. На
+# примере test.py текстовый файл, первой строчкой которого является номер-состояние. Эта строчка меняется при каждом
+# изменении файла и присваивается случайно. В свою очередь test2.py записывает изначальный номер-состояние, а затем,
+# переодически проверяя файл на изменение номера-состояния, ждёт сообщений, а как найдёт - выкладывает и чистит файл
 
 
-def receive_data(queue):
-    try:
-        received = queue.get()
-        print(f"Data received: {received}")
+file = open('data.txt', "r")
+code = file.readline()
+print(code)
+file.close()
 
-    except:
+while True:
+    time.sleep(10)
+    file = open("data.txt", "r")
+    new_code = file.readline()
+    if code != new_code:
+        for i in file.readlines():
+            if i != '\n':
+                print(i)
+        code = new_code
+    file.close()
 
-        print("Queue is empty")
-
-
-if __name__ == "__main__":
-    queue = multiprocessing.Queue()
-    p = multiprocessing.Process(target=receive_data, args=(queue,))
-    p.start()
-    print("test2 started")
-    p.join()
+    file = open("data.txt", "w")
+    file.write(code)
+    file.close()

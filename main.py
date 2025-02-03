@@ -2,8 +2,6 @@ import multiprocessing
 import subprocess
 import time
 
-time
-
 
 def run_script(script_path):
     subprocess.run(["python", script_path], check=True)
