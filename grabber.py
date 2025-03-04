@@ -1,50 +1,81 @@
-from telethon.sync import TelegramClient
-from telethon import errors
-
-import time
+import logging
 import asyncio
+from config import token
 
-# класс для работы с сообщениями
-from telethon.tl.functions.messages import GetHistoryRequest
-from config import api_id, api_hash, username
+import requests
+import time as tm
+
+from aiogram import Bot, Dispatcher
+from aiogram.filters import CommandStart
+from aiogram.types import Message
+from aiogram.methods import DeleteWebhook
 
 
-client = TelegramClient(username, api_id, api_hash)
-client.start()
+def emergency_situation(string):
+    string = string.lower()
+    if "ракетная опасность" in string and "noindex" in string:
+        return f"{string.split('noindex>')[1][-7:-2]} - РО"
+
+    elif "отбой ракетной опасности" in string and "noindex" in string:
+        return f"{string.split('noindex>')[1][-7:-2]} - ОРО"
+
+    elif "БПЛА" in string and "noindex" in string:
+        return f"{string.split('noindex>')[1][-7:-2]} - БПЛА"
+
+    elif "БПЛА" in string and "отбой" in string and "noindex" in string:
+        return f"{string.split('noindex>')[1][-7:-2]} - ОБПЛА"
+    else:
+        return "No update"
 
 
-async def dump_all_messages(channel):
-    offset_msg = 0  # номер записи, с которой начинается считывание
-    limit_msg = 100  # максимальное число записей, передаваемых за один раз
-    all_messages = []  # список всех сообщений
-    total_messages = 0
-    total_count_limit = 0  # поменяйте это значение, если вам нужны не все сообщения
+bot = Bot(token=token)
+dp = Dispatcher()
+headers = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac Os X 10.9; rv:45.0) Gecko/201001101 Firefox/45.0"}
+link = "https://kursk-news.ru/all"
+
+
+@dp.message(CommandStart())
+async def command_start_handler(message: Message):
+
+    data = []
+
+    # req = requests.get(link, headers=headers)
+    # text = req.text.split("div")
+    # for string in text:
+    #     update = emergency_situation(string)
+    #     if update not in data:
+    #         data.append(update)
+    #
+    # tm.sleep(60)
 
     while True:
-        try:
-            history = await client(GetHistoryRequest(
-                peer=channel,
-                offset_id=offset_msg,
-                offset_date=None, add_offset=0,
-                limit=limit_msg, max_id=0, min_id=0,
-                hash=0))
-            if not history.messages:
-                time.sleep(60)
-            messages = history.messages
-            for message in messages:
-                all_messages.append(message.to_dict())
-            for i in all_messages:
-                print(i)
-            print("done...")
-        except errors.FloodWaitError as e:
-            print(f"Flood wait {e.seconds}")
-            await asyncio.sleep(e.seconds)
+
+        req = requests.get(link, headers=headers)
+        text = req.text.split("div")
+
+        for string in text:
+            update = emergency_situation(string)
+            if update not in data:
+                data.append(update)
+                print(update)
+
+        tm.sleep(5)
+
+
+@dp.message()
+async def message_handler(message: Message):
+    update_time = tm.strftime('%d.%m.%Y %H+3:%M:%S', tm.gmtime())
+    logging.info(f"{update_time}; chat id = {message.from_user.id}; user name = {message.from_user.full_name}; "
+                 f"message type = {message.content_type}, {message.chat.id}")
+
+    await message.answer("Сообщение доставлено. Спасибо, что связались с нами!")
 
 
 async def main():
-    channel = await client.get_entity("https://t.me/efssefsefefsf")
-    await dump_all_messages(channel)
+    await bot(DeleteWebhook(drop_pending_updates=True))
+    await dp.start_polling(bot)
 
 
-with client:
-    client.loop.run_until_complete(main())
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(main())
